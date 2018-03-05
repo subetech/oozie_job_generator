@@ -1,11 +1,9 @@
 import math
 
-import os
 import sqlalchemy
+from django.db import models as db_models
 
 from generator import models
-from django.db import models as db_models
-from ojg.settings import BASE_DIR
 
 
 class AbstractDatabase:
@@ -72,11 +70,6 @@ class AbstractDatabase:
             fields_parsed.append([parsed[0], parsed[1]])
         return fields_parsed
 
-    @staticmethod
-    def get_template(template_name):
-        with open(os.path.join(BASE_DIR, "static/tpls/{}".format(template_name))) as template:
-            return template.read()
-
     def generate_create_table(self, table, hive_database_name, table_location, create_table_template, partition,
                               field_template="{} {}"):
         raise NotImplementedError
@@ -84,20 +77,20 @@ class AbstractDatabase:
     def generate_select_string(self, table_part, jira_database_name, partitionize=True):
         raise NotImplementedError
 
-    def define_partition(self, fields):
+    def _define_partition(self, fields):
         raise NotImplementedError
 
     def generate_main(self, hive_database_name, source_database_name, load_type, partition_folder, part_name,
                       table_location, create_table_template, create_table_partition, select_string_partition,
-                      partitionize=False):
+                      parameters_template, workflow_subtask_template, partitionize=False):
 
         raise NotImplementedError
 
     def generate_properties_and_workflow_for_table(self, partition_folder, part_name, hive_table, source_table,
                                                    select_query, parameters_template, workflow_subtask_template,
                                                    next_item=None):
-        props_template = self.get_template(parameters_template)
-        wf_template = self.get_template(workflow_subtask_template)
+        props_template = parameters_template
+        wf_template = workflow_subtask_template
         tbl_camel = self.to_camel_case(hive_table)
         if next_item is None:
             next_item = "end"

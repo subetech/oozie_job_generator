@@ -35,7 +35,6 @@ RESERVED_KEYWORDS = {'ALL', 'ALTER', 'AND', 'ARRAY', 'AS', 'AUTHORIZATION', 'BET
 
 
 class Job(models.Model):
-    id = models.AutoField()
     name = models.CharField(max_length=50)
     db_type = models.IntegerField(choices=AVAILABLE_DATABASES)
     location_path = models.TextField()
@@ -57,3 +56,9 @@ class TableDumpParams(models.Model):
     count = models.IntegerField(default=0)
     fields = models.TextField()
     example_data = models.TextField()
+
+
+class Templates(models.Model):
+    job = models.ForeignKey(Job, on_delete=models.CASCADE)
+    template_type = models.IntegerField(choices=TEMPLATE_TYPES)
+    template = models.TextField()

@@ -15,35 +15,6 @@ TYPES_DICT = {'text': "STRING",
 
 class OracleDatabase(AbstractDatabase):
 
-    def _fetch_info_from_table(self, table):
-        selection = self.engine.execute("SELECT t.* FROM {} t limit 5".format(table))
-        description = selection._cursor_description()
-        fields = []
-        for col in description:
-            fields.append("{}:{}".format(col[0], self._find_type(col[1])))
-        some_data = []
-        for part in selection:
-            some_data.append(part)
-        return fields, some_data
-
-    def _get_all_tables(self, database_name):
-        selection = self.engine.execute(
-            "SELECT TABLE_NAME FROM information_schema.tables where table_schema = '{}'".format(database_name))
-        tables = []
-        for tab in selection:
-            tables.append(tab[0])
-        return tables
-
-    def _convert_types_to_hive(self, postgres_fields):
-
-        def convert_type_to_hive(old_type):
-            return TYPES_DICT[old_type]
-
-        new_fields = []
-        for postgres_field in postgres_fields:
-            new_fields.append([self.check_name(postgres_field[0]), convert_type_to_hive(postgres_field[1])])
-        return new_fields
-
     def generate_create_table(self, table, hive_database_name, table_location, create_table_template, partition,
                               field_template="{} {}"):
 
@@ -56,9 +27,9 @@ class OracleDatabase(AbstractDatabase):
         table_name = "{}.{}".format(hive_database_name, table["table"])
         fields = generate_fields_string(self._convert_types_to_hive(self._get_fields(table)))
         location = table_location.format(table["table"])
-        table_string = self.get_template(create_table_template).format(table_name=table_name, fields=fields,
-                                                                       partition=partition,
-                                                                       location=location)
+        table_string = create_table_template.format(table_name=table_name, fields=fields,
+                                                    partition=partition,
+                                                    location=location)
         return table_string
 
     def generate_select_string(self, table_part, jira_database_name,
@@ -69,7 +40,7 @@ class OracleDatabase(AbstractDatabase):
         jira_table = "{}.{}".format(jira_database_name, table_part["table"])
         all_fields = self._convert_types_to_hive(self._get_fields(table_part))
         new_fields = []
-        found_partition = self.define_partition(all_fields)
+        found_partition = self._define_partition(all_fields)
         for f in all_fields:
             new_fields.append("t.{}".format(f[0]))
         fields = ", ".join(new_fields)
@@ -79,7 +50,65 @@ class OracleDatabase(AbstractDatabase):
             partition = ""
         return select_str.format(fields=fields, jira_table=jira_table, partitions=partition)
 
-    def define_partition(self, fields):
+    def generate_main(self, hive_database_name, source_database_name, load_type, partition_folder, part_name,
+                      table_location, create_table_template, create_table_partition, select_string_partition,
+                      parameters_template, workflow_subtask_template, partitionize=False):
+        first_part = "loadFolder={load_folder} \npartName={part_name}".format(load_folder=partition_folder,
+                                                                              part_name=part_name)
+        create_tables = []
+        properties = []
+        workflows = []
+        for i in range(0, len(self.tables)):
+            create_tables.append(
+                self.generate_create_table(self.tables[i], hive_database_name, table_location, create_table_template,
+                                           create_table_partition))
+            select_str = self.generate_select_string(self.tables[i], source_database_name, select_string_partition,
+                                                     partitionize)
+            if i < len(self.tables) - 1:
+                next_item = "{load_type}_{upper_table_name}".format(load_type=load_type,
+                                                                    upper_table_name=self.tables[i + 1][
+                                                                        "table"].upper())
+            else:
+                next_item = None
+            props, wf = self.generate_properties_and_workflow_for_table(partition_folder, part_name,
+                                                                        self.tables[i]["table"],
+                                                                        self.tables[i]["table"],
+                                                                        select_str, parameters_template,
+                                                                        workflow_subtask_template, next_item)
+            properties.append(props)
+            workflows.append(wf)
+        return create_tables, properties, workflows
+
+    def _get_all_tables(self, database_name):
+        selection = self.engine.execute(
+            "SELECT TABLE_NAME FROM information_schema.tables where table_schema = '{}'".format(database_name))
+        tables = []
+        for tab in selection:
+            tables.append(tab[0])
+        return tables
+
+    def _fetch_info_from_table(self, table):
+        selection = self.engine.execute("SELECT t.* FROM {} t limit 5".format(table))
+        description = selection._cursor_description()
+        fields = []
+        for col in description:
+            fields.append("{}:{}".format(col[0], self._find_type(col[1])))
+        some_data = []
+        for part in selection:
+            some_data.append(part)
+        return fields, some_data
+
+    def _convert_types_to_hive(self, postgres_fields):
+
+        def convert_type_to_hive(old_type):
+            return TYPES_DICT[old_type]
+
+        new_fields = []
+        for postgres_field in postgres_fields:
+            new_fields.append([self.check_name(postgres_field[0]), convert_type_to_hive(postgres_field[1])])
+        return new_fields
+
+    def _define_partition(self, fields):
 
         def find_in_list(some_list, keyword):
             for l in some_list:
@@ -98,34 +127,6 @@ class OracleDatabase(AbstractDatabase):
         if in_list is not None:
             return in_list
         return ""
-
-    def generate_main(self, hive_database_name, source_database_name, load_type, partition_folder, part_name,
-                      table_location, create_table_template, create_table_partition, select_string_partition,
-                      partitionize=False):
-        first_part = "loadFolder={load_folder} \npartName={part_name}".format(load_folder=partition_folder,
-                                                                              part_name=part_name)
-        create_tables = []
-        properties = []
-        workflows = []
-        for i in range(0, len(self.tables)):
-            create_tables.append(
-                self.generate_create_table(self.tables[i], hive_database_name, table_location, create_table_template,
-                                           create_table_partition))
-            select_str = self.generate_select_string(self.tables[i], source_database_name, select_string_partition,
-                                                     partitionize)
-            if i < len(self.tables) - 1:
-                next_item = "{load_type}_{upper_table_name}".format(load_type=load_type,
-                                                                    upper_table_name=self.tables[i + 1][
-                                                                        "table"].upper())
-            else:
-                next_item = None
-            props, wf = self.generate_part_for_properties_and_workflow(partition_folder, part_name,
-                                                                       self.tables[i]["table"],
-                                                                       self.tables[i]["table"],
-                                                                       select_str, next_item)
-            properties.append(props)
-            workflows.append(wf)
-        return create_tables, properties, workflows
 
     def _find_type(self, type_code):
         selection = self.engine.execute("select typname from pg_type where oid = {} order by oid".format(type_code))

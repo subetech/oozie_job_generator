@@ -30,7 +30,7 @@ class AbstractDatabase:
                         "example_data": table.example_data} for table in loaded_tables]
         return self.tables
 
-    def _fetch_info_from_table(self, table):
+    def fetch_info_from_table(self, table):
         """
 
         :param table:
@@ -118,6 +118,9 @@ class AbstractDatabase:
             position = new_position
         queue[-1][1] = length
         return queue
+
+    def get_all_tables_from_source(self, database_name):
+        raise NotImplementedError
 
     @staticmethod
     def to_camel_case(string):

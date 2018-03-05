@@ -39,7 +39,7 @@ class Job(models.Model):
     db_type = models.IntegerField(choices=AVAILABLE_DATABASES)
     location_path = models.TextField()
     description = models.TextField(blank=True, null=True)
-    fields = models.TextField()
+    tables = models.TextField()
     connection_string = models.TextField()
 
 

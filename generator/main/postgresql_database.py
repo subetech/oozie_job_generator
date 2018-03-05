@@ -53,6 +53,7 @@ class OracleDatabase(AbstractDatabase):
     def generate_main(self, hive_database_name, source_database_name, load_type, partition_folder, part_name,
                       table_location, create_table_template, create_table_partition, select_string_partition,
                       parameters_template, workflow_subtask_template, partitionize=False):
+
         first_part = "loadFolder={load_folder} \npartName={part_name}".format(load_folder=partition_folder,
                                                                               part_name=part_name)
         create_tables = []
@@ -79,15 +80,26 @@ class OracleDatabase(AbstractDatabase):
             workflows.append(wf)
         return create_tables, properties, workflows
 
-    def _get_all_tables(self, database_name):
+    def get_all_tables_from_source(self, table_schema):
+        tables = self._get_all_tables(table_schema)
+        new_tables = []
+        for tab in tables:
+            table_count = self.engine.execute("SELECT COUNT(*) FROM jira.{}".format(tab)).fetchone()[0]
+            fields, some_data = self.fetch_info_from_table(tab)
+            new_tables.append(
+                {"table": tab, "count": table_count, "fields": fields, "example_data": [str(x) for x in some_data]}
+            )
+        return some_data
+
+    def _get_all_tables(self, table_schema):
         selection = self.engine.execute(
-            "SELECT TABLE_NAME FROM information_schema.tables where table_schema = '{}'".format(database_name))
+            "SELECT TABLE_NAME FROM information_schema.tables where table_schema = '{}'".format(table_schema))
         tables = []
         for tab in selection:
             tables.append(tab[0])
         return tables
 
-    def _fetch_info_from_table(self, table):
+    def fetch_info_from_table(self, table):
         selection = self.engine.execute("SELECT t.* FROM {} t limit 5".format(table))
         description = selection._cursor_description()
         fields = []

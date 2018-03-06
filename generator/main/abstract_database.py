@@ -1,3 +1,4 @@
+import json
 import math
 
 import sqlalchemy
@@ -26,8 +27,8 @@ class AbstractDatabase:
 
     def load_tables_info_from_database(self, load_id, job_id):
         loaded_tables = models.TableDumpParams.objects.filter(load_id=load_id, job__id=job_id)
-        self.tables = [{"table": table.table_name, "count": table.count, "fields": table.fields,
-                        "example_data": table.example_data} for table in loaded_tables]
+        self.tables = [{"table": table.table_name, "count": table.count, "fields": json.loads(table.fields),
+                        "example_data": json.loads(table.example_data)} for table in loaded_tables]
         return self.tables
 
     def fetch_info_from_table(self, table):
@@ -46,15 +47,16 @@ class AbstractDatabase:
 
     def save_tables_to_database(self, job, load_id=None):
         if load_id is None:
-            load_id = models.TableDumpParams.objects.aggregate(db_models.Max("load_id")) + 1
+            load_id = models.TableDumpParams.objects.aggregate(db_models.Max("load_id"))["load_id__max"]
+            load_id = 1 if load_id is None else load_id + 1
         for table in self.tables:
             new_table = models.TableDumpParams()
             new_table.job = job
             new_table.load_id = load_id
             new_table.table_name = table["table"]
             new_table.count = table["count"]
-            new_table.fields = table["fields"]
-            new_table.example_data = table["example_data"]
+            new_table.fields = json.dumps(table["fields"])
+            new_table.example_data = json.dumps(table["example_data"])
             new_table.save()
         return load_id
 

@@ -20,5 +20,5 @@ from generator import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('postgres/<int:job_id>', views.postgres)
+    path('download/<int:job_id>', views.download)
 ]

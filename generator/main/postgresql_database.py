@@ -13,7 +13,7 @@ TYPES_DICT = {'text': "STRING",
               'bool': "BOOLEAN"}
 
 
-class OracleDatabase(AbstractDatabase):
+class PostgresqlDatabase(AbstractDatabase):
 
     def generate_create_table(self, table, hive_database_name, table_location, create_table_template, partition,
                               field_template="{} {}"):
@@ -84,12 +84,13 @@ class OracleDatabase(AbstractDatabase):
         tables = self._get_all_tables(table_schema)
         new_tables = []
         for tab in tables:
-            table_count = self.engine.execute("SELECT COUNT(*) FROM jira.{}".format(tab)).fetchone()[0]
+            table_count = self.engine.execute("SELECT COUNT(*) FROM {}.{}".format(table_schema, tab)).fetchone()[0]
             fields, some_data = self.fetch_info_from_table(tab)
             new_tables.append(
                 {"table": tab, "count": table_count, "fields": fields, "example_data": [str(x) for x in some_data]}
             )
-        return some_data
+        self.tables = new_tables
+        return new_tables
 
     def _get_all_tables(self, table_schema):
         selection = self.engine.execute(

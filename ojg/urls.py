@@ -17,8 +17,10 @@ from django.contrib import admin
 from django.urls import path
 
 from generator import views
+from generator.views import JobView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('download/<int:job_id>', views.download)
+    path('download/<int:job_id>', views.download),
+    path('job/<int:id>', JobView.as_view(template_name="jobs.html"), name="job")
 ]

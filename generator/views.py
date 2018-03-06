@@ -26,7 +26,6 @@ def download(request, job_id):
 
 
 class JobView(ListView):
-    template_name = "job.html"
     job_id = None
     load_id = None
     load_ids = None
@@ -34,9 +33,9 @@ class JobView(ListView):
     def get(self, request, *args, **kwargs):
         self.job_id = kwargs["id"]
         self.load_id = request.GET.get("load_id")
-        self.load_ids = TableDumpParams.objects.filter(job__pk=self.job_id).values(load_id).distinct()
+        self.load_ids = TableDumpParams.objects.filter(job__pk=self.job_id).values("load_id").distinct()
         if self.load_id is None:
-            self.load_id = self.load_ids.first()
+            self.load_id = self.load_ids.first()["load_id"]
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
